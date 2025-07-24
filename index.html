@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enzo & Buddy's Maze Adventure</title>
+    <title>Enzo, Buddy & Gus's Maze Adventure</title>
     <style>
         body {
             margin: 0;
@@ -79,6 +79,10 @@
             <img class="cat-icon" src="images/buddy.jpg" alt="Buddy">
             <span id="buddy-label">Buddy</span>
         </div>
+        <div class="cat-label">
+            <img class="cat-icon" src="images/gus.jpg" alt="Gus">
+            <span id="gus-label">Gus 👻</span>
+        </div>
     </div>
     
     <canvas id="canvas"></canvas>
@@ -109,19 +113,30 @@
         // Cat images
         const enzoImg = new Image();
         const buddyImg = new Image();
+        const gusImg = new Image();
         let imagesLoaded = false;
+        let enzoLoaded = false;
+        let buddyLoaded = false;
+        let gusLoaded = false;
         
         // Load cat images
         enzoImg.onload = function() {
-            if (buddyImg.complete) imagesLoaded = true;
+            enzoLoaded = true;
+            if (buddyLoaded && gusLoaded) imagesLoaded = true;
         };
         buddyImg.onload = function() {
-            if (enzoImg.complete) imagesLoaded = true;
+            buddyLoaded = true;
+            if (enzoLoaded && gusLoaded) imagesLoaded = true;
+        };
+        gusImg.onload = function() {
+            gusLoaded = true;
+            if (enzoLoaded && buddyLoaded) imagesLoaded = true;
         };
         
         // Set image sources - replace these with your hosted image URLs
-        enzoImg.src = 'enzo.jpg'; // Replace with actual path when hosting
-        buddyImg.src = 'buddy.jpg'; // Replace with actual path when hosting
+        enzoImg.src = 'images/enzo.jpg'; // Replace with actual path when hosting
+        buddyImg.src = 'images/buddy.jpg'; // Replace with actual path when hosting
+        gusImg.src = 'images/gus.jpg'; // Replace with actual path when hosting
         
         // Maze grid
         let maze = [];
@@ -145,6 +160,17 @@
             color: '#4ecdc4',
             name: 'Buddy',
             role: 'chaser'
+        };
+        
+        let gus = { 
+            x: 0, 
+            y: 0, 
+            targetX: 0, 
+            targetY: 0,
+            color: '#9b59b6',
+            name: 'Gus',
+            role: 'wanderer',
+            moveTimer: 0
         };
         
         // Initialize maze
@@ -251,6 +277,10 @@
                 enzo.role = 'runner';
                 buddy.role = 'chaser';
             }
+            
+            // Place Gus randomly anywhere (can be on walls)
+            gus.x = gus.targetX = Math.random() * (cols - 2) * cellSize + cellSize;
+            gus.y = gus.targetY = Math.random() * (rows - 2) * cellSize + cellSize;
         }
         
         function drawMaze() {
@@ -330,14 +360,15 @@
         function drawCat(cat) {
             ctx.save();
             
-            // Debug log
-            if (!imagesLoaded) {
-                console.log('Images not loaded yet, using shapes');
+            // Add ghost effect for Gus
+            if (cat.name === 'Gus') {
+                ctx.globalAlpha = 0.7;
             }
             
             // Draw cat image if loaded, otherwise use shapes
             if (imagesLoaded) {
-                const img = cat.name === 'Enzo' ? enzoImg : buddyImg;
+                const img = cat.name === 'Enzo' ? enzoImg : 
+                           cat.name === 'Buddy' ? buddyImg : gusImg;
                 ctx.drawImage(img, cat.x - catSize/2, cat.y - catSize/2, catSize, catSize);
             } else {
                 // Fallback to shapes if images not loaded
@@ -372,6 +403,15 @@
                 ctx.arc(cat.x - catSize/4, cat.y - catSize/6, catSize/8, 0, Math.PI * 2);
                 ctx.arc(cat.x + catSize/4, cat.y - catSize/6, catSize/8, 0, Math.PI * 2);
                 ctx.fill();
+                
+                // Ghost effect for Gus
+                if (cat.name === 'Gus') {
+                    ctx.strokeStyle = 'rgba(155, 89, 182, 0.5)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(cat.x, cat.y, catSize/2 + 2, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
             }
             
             ctx.restore();
@@ -459,15 +499,48 @@
         }
         
         function updateLabels() {
+            const enzoSeesGus = hasLineOfSight(enzo, gus);
+            const buddySeesGus = hasLineOfSight(buddy, gus);
+            
             document.getElementById('enzo-label').textContent = 
-                `Enzo ${enzo.role === 'chaser' ? '🏃' : '😱'}`;
+                `Enzo ${enzoSeesGus ? '😨' : (enzo.role === 'chaser' ? '🏃' : '😱')}`;
             document.getElementById('buddy-label').textContent = 
-                `Buddy ${buddy.role === 'chaser' ? '🏃' : '😱'}`;
+                `Buddy ${buddySeesGus ? '😨' : (buddy.role === 'chaser' ? '🏃' : '😱')}`;
+        }
+        
+        function hasLineOfSight(cat1, cat2) {
+            // Check if cat1 can see cat2
+            const dx = cat2.x - cat1.x;
+            const dy = cat2.y - cat1.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Check points along the line
+            const steps = Math.ceil(distance / (cellSize / 4));
+            for (let i = 0; i <= steps; i++) {
+                const t = i / steps;
+                const checkX = cat1.x + dx * t;
+                const checkY = cat1.y + dy * t;
+                
+                const gridX = Math.floor(checkX / cellSize);
+                const gridY = Math.floor(checkY / cellSize);
+                
+                // If we hit a wall, no line of sight
+                if (gridX >= 0 && gridX < cols && gridY >= 0 && gridY < rows) {
+                    if (maze[gridY][gridX] === 1) {
+                        return false;
+                    }
+                }
+            }
+            
+            return true;
         }
         
         function updateCat(cat, otherCat) {
             // Check if cornered
             checkIfCornered(cat);
+            
+            // Check if cat can see Gus
+            const canSeeGus = hasLineOfSight(cat, gus);
             
             // Move towards target
             const dx = cat.targetX - cat.x;
@@ -475,11 +548,43 @@
             const dist = Math.sqrt(dx * dx + dy * dy);
             
             if (dist < 1) {
-                // Pick new target based on role
+                // Pick new target based on role and whether Gus is visible
                 let newTarget;
                 
-                if (cat.role === 'chaser') {
-                    // Chase: find path to other cat
+                if (canSeeGus) {
+                    // Priority: Run away from Gus!
+                    const directions = [
+                        { dx: 0, dy: -cellSize },
+                        { dx: cellSize, dy: 0 },
+                        { dx: 0, dy: cellSize },
+                        { dx: -cellSize, dy: 0 }
+                    ];
+                    
+                    let bestDir = null;
+                    let maxDistance = -1;
+                    
+                    // Find the direction that takes us furthest from Gus
+                    for (const dir of directions) {
+                        const newX = cat.x + dir.dx;
+                        const newY = cat.y + dir.dy;
+                        
+                        if (isValidPosition(newX, newY)) {
+                            const distToGus = Math.sqrt(
+                                (newX - gus.x) * (newX - gus.x) + 
+                                (newY - gus.y) * (newY - gus.y)
+                            );
+                            
+                            if (distToGus > maxDistance) {
+                                maxDistance = distToGus;
+                                bestDir = { x: newX, y: newY };
+                            }
+                        }
+                    }
+                    
+                    newTarget = bestDir || { x: cat.x, y: cat.y };
+                    
+                } else if (cat.role === 'chaser') {
+                    // Normal chase behavior when Gus isn't visible
                     const path = findPath(cat.x, cat.y, otherCat.x, otherCat.y);
                     if (path.length > 0) {
                         const nextCell = path[0];
@@ -491,7 +596,7 @@
                         newTarget = { x: cat.x, y: cat.y };
                     }
                 } else {
-                    // Run: pick direction that maximizes path distance
+                    // Normal run behavior when Gus isn't visible
                     const directions = [
                         { dx: 0, dy: -cellSize },
                         { dx: cellSize, dy: 0 },
@@ -522,9 +627,39 @@
                 cat.targetY = newTarget.y;
             } else {
                 // Move towards target
-                const speed = cat.role === 'chaser' ? moveSpeed * 1.1 : moveSpeed;
+                // If running from Gus, move faster!
+                const baseSpeed = cat.role === 'chaser' ? moveSpeed * 1.1 : moveSpeed;
+                const speed = canSeeGus ? baseSpeed * 1.3 : baseSpeed;
                 cat.x += (dx / dist) * speed * cellSize;
                 cat.y += (dy / dist) * speed * cellSize;
+            }
+        }
+        
+        function updateGus() {
+            // Move towards target
+            const dx = gus.targetX - gus.x;
+            const dy = gus.targetY - gus.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist < 1) {
+                // Pick a new random target
+                const angle = Math.random() * Math.PI * 2;
+                const distance = cellSize * (Math.random() * 3 + 1); // 1-4 cells away
+                
+                let newX = gus.x + Math.cos(angle) * distance;
+                let newY = gus.y + Math.sin(angle) * distance;
+                
+                // Keep Gus within canvas bounds
+                newX = Math.max(cellSize/2, Math.min(canvas.width - cellSize/2, newX));
+                newY = Math.max(cellSize/2, Math.min(canvas.height - cellSize/2, newY));
+                
+                gus.targetX = newX;
+                gus.targetY = newY;
+            } else {
+                // Move towards target (slower than other cats)
+                const speed = moveSpeed * 0.7;
+                gus.x += (dx / dist) * speed * cellSize;
+                gus.y += (dy / dist) * speed * cellSize;
             }
         }
         
@@ -534,10 +669,12 @@
             if (!isPaused) {
                 updateCat(enzo, buddy);
                 updateCat(buddy, enzo);
+                updateGus();
             }
             
             drawCat(enzo);
             drawCat(buddy);
+            drawCat(gus);
             
             requestAnimationFrame(animate);
         }
@@ -564,24 +701,6 @@
         updateLabels();
         
         // Force load images and start animation
-        enzoImg.onload = function() {
-            console.log('Enzo sprite loaded');
-            enzoLoaded = true;
-            if (buddyLoaded) {
-                imagesLoaded = true;
-                console.log('Both sprites ready!');
-            }
-        };
-        
-        buddyImg.onload = function() {
-            console.log('Buddy sprite loaded');
-            buddyLoaded = true;
-            if (enzoLoaded) {
-                imagesLoaded = true;
-                console.log('Both sprites ready!');
-            }
-        };
-        
         enzoImg.onerror = function() {
             console.error('Failed to load Enzo sprite from:', enzoImg.src);
         };
@@ -590,9 +709,9 @@
             console.error('Failed to load Buddy sprite from:', buddyImg.src);
         };
         
-        // Set sources AFTER defining handlers
-        enzoImg.src = 'images/enzo.jpg';
-        buddyImg.src = 'images/buddy.jpg';
+        gusImg.onerror = function() {
+            console.error('Failed to load Gus sprite from:', gusImg.src);
+        };
         
         // Start animation immediately (will use shapes until images load)
         animate();
