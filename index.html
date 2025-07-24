@@ -255,6 +255,11 @@
         function drawCat(cat) {
             ctx.save();
             
+            // Debug log
+            if (!imagesLoaded) {
+                console.log('Images not loaded yet, using shapes');
+            }
+            
             // Draw cat image if loaded, otherwise use shapes
             if (imagesLoaded) {
                 const img = cat.name === 'Enzo' ? enzoImg : buddyImg;
@@ -482,6 +487,39 @@
         // Initialize
         generateMaze();
         updateLabels();
+        
+        // Force load images and start animation
+        enzoImg.onload = function() {
+            console.log('Enzo sprite loaded');
+            enzoLoaded = true;
+            if (buddyLoaded) {
+                imagesLoaded = true;
+                console.log('Both sprites ready!');
+            }
+        };
+        
+        buddyImg.onload = function() {
+            console.log('Buddy sprite loaded');
+            buddyLoaded = true;
+            if (enzoLoaded) {
+                imagesLoaded = true;
+                console.log('Both sprites ready!');
+            }
+        };
+        
+        enzoImg.onerror = function() {
+            console.error('Failed to load Enzo sprite from:', enzoImg.src);
+        };
+        
+        buddyImg.onerror = function() {
+            console.error('Failed to load Buddy sprite from:', buddyImg.src);
+        };
+        
+        // Set sources AFTER defining handlers
+        enzoImg.src = 'images/enzo.jpg';
+        buddyImg.src = 'images/buddy.jpg';
+        
+        // Start animation immediately (will use shapes until images load)
         animate();
     </script>
 </body>
