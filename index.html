@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enzo & Buddy's Maze Adventure</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        #canvas {
+            border: 2px solid #444;
+            background: #000;
+            cursor: crosshair;
+        }
+        
+        .controls {
+            margin: 20px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background: #357abd;
+        }
+        
+        .info {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .cat-info {
+            display: flex;
+            gap: 40px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+        
+        .cat-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .cat-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <h1>Enzo & Buddy's Maze Adventure</h1>
+    </div>
+    
+    <div class="cat-info">
+        <div class="cat-label">
+            <div class="cat-icon" style="background: #ff6b6b;"></div>
+            <span id="enzo-label">Enzo</span>
+        </div>
+        <div class="cat-label">
+            <div class="cat-icon" style="background: #4ecdc4;"></div>
+            <span id="buddy-label">Buddy</span>
+        </div>
+    </div>
+    
+    <canvas id="canvas"></canvas>
+    
+    <div class="controls">
+        <button onclick="generateNewMaze()">Generate New Maze</button>
+        <button onclick="togglePause()">Pause/Resume</button>
+        <button onclick="adjustSpeed()">Speed: Normal</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Maze settings
+        const cellSize = 20;
+        const cols = 40;
+        const rows = 30;
+        canvas.width = cols * cellSize;
+        canvas.height = rows * cellSize;
+        
+        // Cat settings
+        let isPaused = false;
+        const catSize = cellSize * 0.8;
+        let moveSpeed = 0.02;
+        let speedMode = 0;
+        
+        // Cat images
+        const enzoImg = new Image();
+        const buddyImg = new Image();
+        let imagesLoaded = false;
+        
+        // Load cat images
+        enzoImg.onload = function() {
+            if (buddyImg.complete) imagesLoaded = true;
+        };
+        buddyImg.onload = function() {
+            if (enzoImg.complete) imagesLoaded = true;
+        };
+        
+        // Set image sources - replace these with your hosted image URLs
+        enzoImg.src = 'images/enzo.jpg'; // Replace with actual path when hosting
+        buddyImg.src = 'images/buddy.jpg'; // Replace with actual path when hosting
+        
+        // Maze grid
+        let maze = [];
+        
+        // Cats
+        let enzo = { 
+            x: 0, 
+            y: 0, 
+            targetX: 0, 
+            targetY: 0,
+            color: '#ff6b6b',
+            name: 'Enzo',
+            role: 'runner'
+        };
+        
+        let buddy = { 
+            x: 0, 
+            y: 0, 
+            targetX: 0, 
+            targetY: 0,
+            color: '#4ecdc4',
+            name: 'Buddy',
+            role: 'chaser'
+        };
+        
+        // Initialize maze
+        function initMaze() {
+            maze = [];
+            for (let y = 0; y < rows; y++) {
+                maze[y] = [];
+                for (let x = 0; x < cols; x++) {
+                    maze[y][x] = 1;
+                }
+            }
+        }
+        
+        // Generate maze using recursive backtracking
+        function generateMaze() {
+            initMaze();
+            const stack = [];
+            const start = { x: 0, y: 0 };
+            maze[start.y][start.x] = 0;
+            stack.push(start);
+            
+            while (stack.length > 0) {
+                const current = stack[stack.length - 1];
+                const neighbors = getUnvisitedNeighbors(current.x, current.y);
+                
+                if (neighbors.length > 0) {
+                    const next = neighbors[Math.floor(Math.random() * neighbors.length)];
+                    removeWall(current.x, current.y, next.x, next.y);
+                    maze[next.y][next.x] = 0;
+                    stack.push(next);
+                } else {
+                    stack.pop();
+                }
+            }
+            
+            placeCatsRandomly();
+        }
+        
+        function getUnvisitedNeighbors(x, y) {
+            const neighbors = [];
+            const directions = [
+                { dx: 0, dy: -2 },
+                { dx: 2, dy: 0 },
+                { dx: 0, dy: 2 },
+                { dx: -2, dy: 0 }
+            ];
+            
+            for (const dir of directions) {
+                const nx = x + dir.dx;
+                const ny = y + dir.dy;
+                if (nx >= 0 && nx < cols && ny >= 0 && ny < rows && maze[ny][nx] === 1) {
+                    neighbors.push({ x: nx, y: ny });
+                }
+            }
+            
+            return neighbors;
+        }
+        
+        function removeWall(x1, y1, x2, y2) {
+            const wallX = (x1 + x2) / 2;
+            const wallY = (y1 + y2) / 2;
+            maze[wallY][wallX] = 0;
+        }
+        
+        function placeCatsRandomly() {
+            const openCells = [];
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    if (maze[y][x] === 0) {
+                        openCells.push({ x, y });
+                    }
+                }
+            }
+            
+            if (openCells.length >= 2) {
+                const pos1 = openCells[Math.floor(Math.random() * openCells.length)];
+                enzo.x = enzo.targetX = pos1.x * cellSize + cellSize / 2;
+                enzo.y = enzo.targetY = pos1.y * cellSize + cellSize / 2;
+                
+                let pos2;
+                do {
+                    pos2 = openCells[Math.floor(Math.random() * openCells.length)];
+                } while (Math.abs(pos2.x - pos1.x) < 5 && Math.abs(pos2.y - pos1.y) < 5);
+                
+                buddy.x = buddy.targetX = pos2.x * cellSize + cellSize / 2;
+                buddy.y = buddy.targetY = pos2.y * cellSize + cellSize / 2;
+                
+                // Reset roles
+                enzo.role = 'runner';
+                buddy.role = 'chaser';
+            }
+        }
+        
+        function drawMaze() {
+            ctx.fillStyle = '#222';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#444';
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    if (maze[y][x] === 1) {
+                        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                    }
+                }
+            }
+        }
+        
+        function drawCat(cat) {
+            ctx.save();
+            
+            // Draw cat image if loaded, otherwise use shapes
+            if (imagesLoaded) {
+                const img = cat.name === 'Enzo' ? enzoImg : buddyImg;
+                ctx.drawImage(img, cat.x - catSize/2, cat.y - catSize/2, catSize, catSize);
+            } else {
+                // Fallback to shapes if images not loaded
+                ctx.fillStyle = cat.color;
+                
+                // Main body
+                ctx.beginPath();
+                ctx.arc(cat.x, cat.y, catSize/2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Ears
+                const earSize = catSize/3;
+                const earOffset = catSize/2.5;
+                
+                ctx.beginPath();
+                ctx.moveTo(cat.x - earOffset, cat.y - earOffset);
+                ctx.lineTo(cat.x - earOffset + earSize/2, cat.y - earOffset - earSize);
+                ctx.lineTo(cat.x - earOffset + earSize, cat.y - earOffset);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.moveTo(cat.x + earOffset - earSize, cat.y - earOffset);
+                ctx.lineTo(cat.x + earOffset - earSize/2, cat.y - earOffset - earSize);
+                ctx.lineTo(cat.x + earOffset, cat.y - earOffset);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Eyes
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(cat.x - catSize/4, cat.y - catSize/6, catSize/8, 0, Math.PI * 2);
+                ctx.arc(cat.x + catSize/4, cat.y - catSize/6, catSize/8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            ctx.restore();
+        }
+        
+        function isValidPosition(x, y) {
+            const gridX = Math.floor(x / cellSize);
+            const gridY = Math.floor(y / cellSize);
+            
+            if (gridX < 0 || gridX >= cols || gridY < 0 || gridY >= rows) {
+                return false;
+            }
+            
+            return maze[gridY][gridX] === 0;
+        }
+        
+        // A* pathfinding
+        function findPath(startX, startY, endX, endY) {
+            const startGridX = Math.floor(startX / cellSize);
+            const startGridY = Math.floor(startY / cellSize);
+            const endGridX = Math.floor(endX / cellSize);
+            const endGridY = Math.floor(endY / cellSize);
+            
+            const queue = [{x: startGridX, y: startGridY, path: []}];
+            const visited = new Set();
+            visited.add(`${startGridX},${startGridY}`);
+            
+            const dirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+            
+            while (queue.length > 0) {
+                const current = queue.shift();
+                
+                if (current.x === endGridX && current.y === endGridY) {
+                    return current.path;
+                }
+                
+                for (const [dx, dy] of dirs) {
+                    const nx = current.x + dx;
+                    const ny = current.y + dy;
+                    const key = `${nx},${ny}`;
+                    
+                    if (nx >= 0 && nx < cols && ny >= 0 && ny < rows && 
+                        maze[ny][nx] === 0 && !visited.has(key)) {
+                        visited.add(key);
+                        queue.push({
+                            x: nx, 
+                            y: ny, 
+                            path: [...current.path, {x: nx, y: ny}]
+                        });
+                    }
+                }
+            }
+            
+            return [];
+        }
+        
+        function checkIfCornered(cat) {
+            const directions = [
+                { dx: 0, dy: -cellSize },
+                { dx: cellSize, dy: 0 },
+                { dx: 0, dy: cellSize },
+                { dx: -cellSize, dy: 0 }
+            ];
+            
+            let exits = 0;
+            for (const dir of directions) {
+                const newX = cat.x + dir.dx;
+                const newY = cat.y + dir.dy;
+                if (isValidPosition(newX, newY)) {
+                    exits++;
+                }
+            }
+            
+            // If only 1 exit (3 walls) and cat is running, switch roles
+            if (exits === 1 && cat.role === 'runner') {
+                if (cat.name === 'Enzo') {
+                    enzo.role = 'chaser';
+                    buddy.role = 'runner';
+                } else {
+                    buddy.role = 'chaser';
+                    enzo.role = 'runner';
+                }
+                updateLabels();
+            }
+        }
+        
+        function updateLabels() {
+            document.getElementById('enzo-label').textContent = 
+                `Enzo ${enzo.role === 'chaser' ? '🏃' : '😱'}`;
+            document.getElementById('buddy-label').textContent = 
+                `Buddy ${buddy.role === 'chaser' ? '🏃' : '😱'}`;
+        }
+        
+        function updateCat(cat, otherCat) {
+            // Check if cornered
+            checkIfCornered(cat);
+            
+            // Move towards target
+            const dx = cat.targetX - cat.x;
+            const dy = cat.targetY - cat.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist < 1) {
+                // Pick new target based on role
+                let newTarget;
+                
+                if (cat.role === 'chaser') {
+                    // Chase: find path to other cat
+                    const path = findPath(cat.x, cat.y, otherCat.x, otherCat.y);
+                    if (path.length > 0) {
+                        const nextCell = path[0];
+                        newTarget = {
+                            x: nextCell.x * cellSize + cellSize / 2,
+                            y: nextCell.y * cellSize + cellSize / 2
+                        };
+                    } else {
+                        newTarget = { x: cat.x, y: cat.y };
+                    }
+                } else {
+                    // Run: pick direction that maximizes path distance
+                    const directions = [
+                        { dx: 0, dy: -cellSize },
+                        { dx: cellSize, dy: 0 },
+                        { dx: 0, dy: cellSize },
+                        { dx: -cellSize, dy: 0 }
+                    ];
+                    
+                    let bestDir = null;
+                    let maxPathLength = -1;
+                    
+                    for (const dir of directions) {
+                        const newX = cat.x + dir.dx;
+                        const newY = cat.y + dir.dy;
+                        
+                        if (isValidPosition(newX, newY)) {
+                            const path = findPath(otherCat.x, otherCat.y, newX, newY);
+                            if (path.length > maxPathLength) {
+                                maxPathLength = path.length;
+                                bestDir = { x: newX, y: newY };
+                            }
+                        }
+                    }
+                    
+                    newTarget = bestDir || { x: cat.x, y: cat.y };
+                }
+                
+                cat.targetX = newTarget.x;
+                cat.targetY = newTarget.y;
+            } else {
+                // Move towards target
+                const speed = cat.role === 'chaser' ? moveSpeed * 1.1 : moveSpeed;
+                cat.x += (dx / dist) * speed * cellSize;
+                cat.y += (dy / dist) * speed * cellSize;
+            }
+        }
+        
+        function animate() {
+            drawMaze();
+            
+            if (!isPaused) {
+                updateCat(enzo, buddy);
+                updateCat(buddy, enzo);
+            }
+            
+            drawCat(enzo);
+            drawCat(buddy);
+            
+            requestAnimationFrame(animate);
+        }
+        
+        function generateNewMaze() {
+            generateMaze();
+            updateLabels();
+        }
+        
+        function togglePause() {
+            isPaused = !isPaused;
+        }
+        
+        function adjustSpeed() {
+            speedMode = (speedMode + 1) % 3;
+            const speeds = [0.02, 0.04, 0.01];
+            const labels = ['Normal', 'Fast', 'Slow'];
+            moveSpeed = speeds[speedMode];
+            event.target.textContent = `Speed: ${labels[speedMode]}`;
+        }
+        
+        // Initialize
+        generateMaze();
+        updateLabels();
+        animate();
+    </script>
+</body>
+</html>
