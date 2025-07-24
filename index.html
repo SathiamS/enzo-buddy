@@ -62,24 +62,21 @@
         }
         
         .cat-icon {
-            width: 20px;
-            height: 20px;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
+            object-fit: cover;
         }
     </style>
 </head>
 <body>
-    <div class="info">
-        <h1>Enzo & Buddy's Maze Adventure</h1>
-    </div>
-    
     <div class="cat-info">
         <div class="cat-label">
-            <div class="cat-icon" style="background: #ff6b6b;"></div>
+            <img class="cat-icon" src="images/enzo.jpg" alt="Enzo">
             <span id="enzo-label">Enzo</span>
         </div>
         <div class="cat-label">
-            <div class="cat-icon" style="background: #4ecdc4;"></div>
+            <img class="cat-icon" src="images/buddy.jpg" alt="Buddy">
             <span id="buddy-label">Buddy</span>
         </div>
     </div>
@@ -123,8 +120,8 @@
         };
         
         // Set image sources - replace these with your hosted image URLs
-        enzoImg.src = 'images/enzo.jpg'; // Replace with actual path when hosting
-        buddyImg.src = 'images/buddy.jpg'; // Replace with actual path when hosting
+        enzoImg.src = 'enzo.jpg'; // Replace with actual path when hosting
+        buddyImg.src = 'buddy.jpg'; // Replace with actual path when hosting
         
         // Maze grid
         let maze = [];
