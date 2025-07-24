@@ -95,8 +95,8 @@
         
         // Maze settings
         const cellSize = 20;
-        const cols = 40;
-        const rows = 30;
+        const cols = 39; // Reduced by 1 to fix right border
+        const rows = 29; // Reduced by 1 to fix bottom border
         canvas.width = cols * cellSize;
         canvas.height = rows * cellSize;
         
@@ -161,10 +161,14 @@
         // Generate maze using recursive backtracking
         function generateMaze() {
             initMaze();
+            
+            // Ensure we have proper borders by not touching the edges
             const stack = [];
-            const start = { x: 0, y: 0 };
-            maze[start.y][start.x] = 0;
-            stack.push(start);
+            // Start from an even coordinate inside the borders
+            const startX = 2;
+            const startY = 2;
+            maze[startY][startX] = 0;
+            stack.push({ x: startX, y: startY });
             
             while (stack.length > 0) {
                 const current = stack[stack.length - 1];
@@ -178,6 +182,16 @@
                 } else {
                     stack.pop();
                 }
+            }
+            
+            // Ensure all borders are walls
+            for (let x = 0; x < cols; x++) {
+                maze[0][x] = 1; // Top border
+                maze[rows - 1][x] = 1; // Bottom border
+            }
+            for (let y = 0; y < rows; y++) {
+                maze[y][0] = 1; // Left border
+                maze[y][cols - 1] = 1; // Right border
             }
             
             placeCatsRandomly();
@@ -195,7 +209,8 @@
             for (const dir of directions) {
                 const nx = x + dir.dx;
                 const ny = y + dir.dy;
-                if (nx >= 0 && nx < cols && ny >= 0 && ny < rows && maze[ny][nx] === 1) {
+                // Keep at least 1 cell away from all borders
+                if (nx >= 2 && nx < cols - 2 && ny >= 2 && ny < rows - 2 && maze[ny][nx] === 1) {
                     neighbors.push({ x: nx, y: ny });
                 }
             }
@@ -239,10 +254,17 @@
         }
         
         function drawMaze() {
-            ctx.fillStyle = '#222';
+            // Clear entire canvas with black background
+            ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            ctx.fillStyle = '#444';
+            // Create a leafy hedge pattern
+            const hedgeGradient = ctx.createPattern(createHedgePattern(), 'repeat');
+            
+            // Draw walls with hedge pattern
+            ctx.fillStyle = hedgeGradient || '#2d5016'; // Fallback to dark green
+            
+            // Draw the maze walls
             for (let y = 0; y < rows; y++) {
                 for (let x = 0; x < cols; x++) {
                     if (maze[y][x] === 1) {
@@ -250,6 +272,59 @@
                     }
                 }
             }
+            
+            // Add subtle shadows to walls for depth
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    if (maze[y][x] === 1) {
+                        // Add shadow on bottom and right edges
+                        ctx.fillRect(x * cellSize + cellSize - 2, y * cellSize + 2, 2, cellSize - 2);
+                        ctx.fillRect(x * cellSize + 2, y * cellSize + cellSize - 2, cellSize - 2, 2);
+                    }
+                }
+            }
+        }
+        
+        // Create a hedge-like texture pattern
+        function createHedgePattern() {
+            const patternCanvas = document.createElement('canvas');
+            const patternCtx = patternCanvas.getContext('2d');
+            patternCanvas.width = 40;
+            patternCanvas.height = 40;
+            
+            // Base dark green color
+            patternCtx.fillStyle = '#2d5016';
+            patternCtx.fillRect(0, 0, 40, 40);
+            
+            // Add leafy texture with various shades of green
+            const leafColors = ['#3d6020', '#4a7c2a', '#5a8c3a', '#3a5a1a'];
+            
+            // Draw random leaf-like shapes
+            for (let i = 0; i < 30; i++) {
+                patternCtx.fillStyle = leafColors[Math.floor(Math.random() * leafColors.length)];
+                const x = Math.random() * 40;
+                const y = Math.random() * 40;
+                const size = Math.random() * 4 + 2;
+                
+                // Draw small leaf shapes
+                patternCtx.beginPath();
+                patternCtx.ellipse(x, y, size, size * 0.6, Math.random() * Math.PI, 0, Math.PI * 2);
+                patternCtx.fill();
+            }
+            
+            // Add some darker spots for depth
+            for (let i = 0; i < 10; i++) {
+                patternCtx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                const x = Math.random() * 40;
+                const y = Math.random() * 40;
+                const size = Math.random() * 3 + 1;
+                patternCtx.beginPath();
+                patternCtx.arc(x, y, size, 0, Math.PI * 2);
+                patternCtx.fill();
+            }
+            
+            return patternCanvas;
         }
         
         function drawCat(cat) {
